@@ -107,12 +107,6 @@ fn handle_end(end_req: Json<GameState>) -> Status {
 
 #[launch]
 fn rocket() -> _ {
-    let trainer = Arc::clone(&AGENT_TRAINER);
-    let trainer_lock = trainer.lock();
-    let mut trainer_obj = trainer_lock.unwrap();
-    learning::train(&mut trainer_obj);
-    drop(trainer_obj);
-
     // Lots of web hosting services expect you to bind to the port specified by the `PORT`
     // environment variable. However, Rocket looks at the `ROCKET_PORT` environment variable.
     // If we find a value for `PORT`, we set `ROCKET_PORT` to that value.

@@ -14,8 +14,8 @@ pub struct MyState {
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct MyAction {
-    dx: i32,
-    dy: i32,
+    pub dx: i32,
+    pub dy: i32,
 }
 
 impl State for MyState {
@@ -55,14 +55,10 @@ impl Agent<MyState> for MyAgent {
     }
 }
 
-pub fn train(trainer: &mut AgentTrainer<MyState>) {
+pub fn train(trainer: &mut AgentTrainer<MyState>, state: &MyState) {
     println!("TRAINING");
     let mut agent = MyAgent {
-        state: MyState {
-            x: 0,
-            y: 0,
-            goal: (5, 5),
-        },
+        state: state.clone(),
     };
     trainer.train(
         &mut agent,

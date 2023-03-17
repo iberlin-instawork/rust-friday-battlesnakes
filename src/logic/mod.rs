@@ -14,14 +14,15 @@ mod goal;
 
 use core::panic;
 use log::info;
+use pathfinding::prelude::astar;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-use crate::learning::MyState;
+use crate::learning::{MyState, query, self};
 use crate::utils::{self};
 use crate::AGENT_TRAINER;
 use crate::{Battlesnake, Board as BattlesnakeBoard, Coord as BattlesnakeCoord, Game};
-use rust_pathfinding::PathfindingPos;
+use rust_pathfinding::{Board as PathfindingBoard, PathfindingPos};
 
 #[derive(Debug)]
 pub enum SnakePersonality {
@@ -29,6 +30,7 @@ pub enum SnakePersonality {
     Timid,      // Avoid snakes at all costs
     HeadHunter, // Kills other snakes
     Snacky,     // Eats food when it's safe to do so
+    QLearning,  // Uses QLearning model
 }
 
 #[derive(Debug, PartialEq)]
@@ -84,7 +86,7 @@ pub fn end(_game: &Game, _turn: &u32, _board: &BattlesnakeBoard, _you: &Battlesn
 // See https://docs.battlesnake.com/api/example-move for available data
 pub fn get_move(_game: &Game, turn: &u32, board: &BattlesnakeBoard, you: &Battlesnake) -> Value {
     let my_head = &you.body[0]; // Coordinates of your head
-    let personality = SnakePersonality::HeadHunter;
+    let personality = SnakePersonality::QLearning;
 
     // WHAT MODE AM I IN?????
     let mode = utils::get_snake_mode(board, you, &personality);
@@ -107,20 +109,73 @@ pub fn get_move(_game: &Game, turn: &u32, board: &BattlesnakeBoard, you: &Battle
     // 4. ?
 
     // 5. MOVE THERE!
-    let chosen = determine_next_move(&moves, board, my_head);
+    let chosen = determine_next_move(&personality, &moves, &pathfinding_board, board, my_head);
     info!("MOVE {}: {}", turn, chosen);
     return json!({ "move": chosen });
 }
 
 fn determine_next_move(
-    moves: &(Vec<PathfindingPos>, u32),
+    personality: &SnakePersonality,
+    goal: &BattlesnakeCoord,
+    pathfinding_board: &PathfindingBoard,
     board: &BattlesnakeBoard,
     head: &BattlesnakeCoord,
 ) -> &'static str {
-    println!("Current Pathfinder Path: {:?}", moves);
-    let next_move = moves.0.get(1).expect("No more moves to make");
-    let converted_next_move = utils::pos_to_coord(board, next_move);
-    println!("Next Pathfinder Move: {:?}", next_move);
-    println!("Next Battlesnake Move: {:?}", converted_next_move);
-    utils::get_next_move_from_coord(head, &converted_next_move)
+    println!("Current Pathfinder Path: {:?}", goal);
+
+    match personality {
+        &SnakePersonality::QLearning => {
+            let trainer = Arc::clone(&AGENT_TRAINER);
+            let trainer_lock = trainer.lock();
+            let mut trainer_obj = trainer_lock.unwrap();
+            
+            let state = MyState {
+                x: head.x as i32,
+                y: head.y as i32,
+                goal: (goal.x as i32, goal.y as i32),
+            };
+
+            learning::train(&mut trainer_obj, &state);
+            let next_move = query(&trainer_obj, &state);
+            if let Some(action) = next_move {
+                if action.dx == 0 && action.dy == 1 {
+                    "up"
+                } else if action.dx == 0 && action.dy == -1 {
+                    "down"
+                } else if action.dx == 1 && action.dy == 0 {
+                    "right"
+                } else if action.dx == -1 && action.dy == 0 {
+                    "left"
+                } else {
+                    panic!("Not possible");
+                }
+            } else {
+                panic!("No move retrieved from QLearning");
+            }
+        }
+        _ => {
+            let self_pos = utils::coord_to_pos(board, head);
+            let goal_pos = utils::coord_to_pos(board, goal);
+            let potential_moves = astar(
+                &self_pos,
+                |p| {
+                    pathfinding_board
+                        .get_successors(p)
+                        .iter()
+                        .map(|s| (s.pos, s.cost))
+                        .collect::<Vec<_>>()
+                },
+                |p| ((p.0 - goal_pos.0).abs() + (p.1 - goal_pos.1).abs()) as u32,
+                |p| *p == goal_pos,
+            );
+            let next_move = potential_moves.expect("No moves");
+            let next_move = next_move.0.get(1).expect("No more moves to make");
+            let converted_next_move = utils::pos_to_coord(board, next_move);
+            println!("Next Pathfinder Move: {:?}", next_move);
+            println!("Next Battlesnake Move: {:?}", converted_next_move);
+            utils::get_next_move_from_coord(head, &converted_next_move)
+        }
+    }
+
+    
 }

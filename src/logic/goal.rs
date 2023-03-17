@@ -13,31 +13,21 @@ pub fn determine_goal(
     pathfinding_board: &PathfindingBoard,
     board: &BattlesnakeBoard,
     head: &BattlesnakeCoord,
-) -> Option<(Vec<PathfindingPos>, u32)> {
-    let self_pos = utils::coord_to_pos(board, head);
-    let goal_pos = match personality {
-        &SnakePersonality::Snacky => utils::coord_to_pos(board, find_delicious_food(board, head)),
+) -> Option<BattlesnakeCoord> {
+    match personality {
+        &SnakePersonality::Snacky => Some(find_delicious_food(board, head).clone()),
         &SnakePersonality::HeadHunter => {
             if *mode == SnakeMode::Eat {
-                utils::coord_to_pos(board, find_delicious_food(board, head))
+                Some(find_delicious_food(board, head).clone())
             } else {
-                utils::coord_to_pos(board, find_delicious_snake(board, head))
+                Some(find_delicious_snake(board, head).clone())
             }
         }
-        a => panic!("That personality isn't implemented yet: {:?}", a),
-    };
-    return astar(
-        &self_pos,
-        |p| {
-            pathfinding_board
-                .get_successors(p)
-                .iter()
-                .map(|s| (s.pos, s.cost))
-                .collect::<Vec<_>>()
-        },
-        |p| ((p.0 - goal_pos.0).abs() + (p.1 - goal_pos.1).abs()) as u32,
-        |p| *p == goal_pos,
-    );
+        &SnakePersonality::QLearning => {
+            Some(find_delicious_food(board, head).clone())
+        }
+        a => None,
+    }
 }
 
 fn find_delicious_snake<'a>(
