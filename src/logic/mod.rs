@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use crate::learning::{MyState, query, self};
 use crate::utils::{self};
-use crate::AGENT_TRAINER;
+use crate::{AGENT_TRAINER, SnakeHistory, SNAKES_HISTORY};
 use crate::{Battlesnake, Board as BattlesnakeBoard, Coord as BattlesnakeCoord, Game};
 use rust_pathfinding::{Board as PathfindingBoard, PathfindingPos};
 
@@ -86,7 +86,25 @@ pub fn end(_game: &Game, _turn: &u32, _board: &BattlesnakeBoard, _you: &Battlesn
 // See https://docs.battlesnake.com/api/example-move for available data
 pub fn get_move(_game: &Game, turn: &u32, board: &BattlesnakeBoard, you: &Battlesnake) -> Value {
     let my_head = &you.body[0]; // Coordinates of your head
-    let personality = SnakePersonality::QLearning;
+    let personality = SnakePersonality::HeadHunter;
+    let snakes_history = Arc::clone(&SNAKES_HISTORY);
+    let mut snakes_history_lock = snakes_history.lock().unwrap();
+
+    for snake in &board.snakes[1..] {
+
+        let mut default_history = SnakeHistory{
+            moves: vec![]
+        };
+
+        let entry = snakes_history_lock.entry(snake.id.clone()).or_insert(default_history);
+
+        entry.moves.push((*turn, snake.head.clone()))
+    }
+
+
+    println!("History: {:?} ", snakes_history_lock);
+
+
 
     // WHAT MODE AM I IN?????
     let mode = utils::get_snake_mode(board, you, &personality);

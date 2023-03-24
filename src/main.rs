@@ -22,6 +22,9 @@ mod utils;
 lazy_static! {
     static ref AGENT_TRAINER: Arc<Mutex<AgentTrainer<learning::MyState>>> =
         Arc::new(Mutex::from(AgentTrainer::new()));
+
+    static ref SNAKES_HISTORY: Arc<Mutex<HashMap<String, SnakeHistory>>> =
+    Arc::new(Mutex::from(HashMap::new()));
 }
 
 // API and Response Objects
@@ -67,6 +70,11 @@ pub struct GameState {
     turn: u32,
     board: Board,
     you: Battlesnake,
+}
+
+#[derive(Debug)]
+pub struct SnakeHistory {
+    moves: Vec<(u32, Coord)>,
 }
 
 #[get("/")]

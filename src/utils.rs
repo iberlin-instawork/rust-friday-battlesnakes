@@ -65,7 +65,7 @@ pub fn get_snake_mode(
                 snake.body.len(),
                 largest_snake
             );
-            if snake.body.len() > largest_snake {
+            if snake.body.len() > largest_snake && board.snakes.len() > 1 {
                 SnakeMode::Kill
             } else {
                 SnakeMode::Eat
